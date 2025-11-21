@@ -21,4 +21,17 @@ app.listen(port, () => {
     console.log(`Backend server running at http://localhost:${port}`);
 });
 
+// Graceful shutdown
+process.on('SIGINT', async () => {
+    console.log('Shutting down gracefully...');
+    await prisma.$disconnect();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('Shutting down gracefully...');
+    await prisma.$disconnect();
+    process.exit(0);
+});
+
 export { app, prisma };

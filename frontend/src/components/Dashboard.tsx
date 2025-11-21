@@ -1,9 +1,10 @@
 import { Card, Title, Text, Box, Stack, Divider, SimpleGrid, Group, SegmentedControl, Slider, NumberInput, Button, LoadingOverlay, Notification, ThemeIcon, Table, Pagination, Skeleton } from '@mantine/core';
-import { IconCurrencyDollar, IconPercentage, IconCheck, IconChartPie, IconArrowUpRight } from '@tabler/icons-react';
+import { IconCurrencyDollar, IconPercentage, IconCheck, IconChartPie } from '@tabler/icons-react';
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import currency from 'currency.js';
 import { ImpactWidget } from './ImpactWidget';
+import type { YTDData, ContributionHistoryEntry } from '../types';
 
 export function Dashboard() {
     const [refreshKey, setRefreshKey] = useState(0);
@@ -21,13 +22,14 @@ export function Dashboard() {
     const [salary, setSalary] = useState<number>(0);
     const [payFrequency, setPayFrequency] = useState<number>(26);
     const [userName, setUserName] = useState<string>('User');
+    const [isEditingRate, setIsEditingRate] = useState(false);
 
     // YTD widget state
-    const [ytdData, setYtdData] = useState<any>(null);
+    const [ytdData, setYtdData] = useState<YTDData | null>(null);
     const [ytdLoading, setYtdLoading] = useState(true);
 
     // History state
-    const [history, setHistory] = useState<any[]>([]);
+    const [history, setHistory] = useState<ContributionHistoryEntry[]>([]);
     const [historyLoading, setHistoryLoading] = useState(true);
     const [page, setPage] = useState(1);
     const itemsPerPage = 5;
@@ -37,8 +39,7 @@ export function Dashboard() {
     }, []);
 
     useEffect(() => {
-        loadYTDData();
-        loadHistory();
+        loadYTDAndHistory();
     }, [refreshKey]);
 
     const loadData = async () => {
@@ -56,35 +57,27 @@ export function Dashboard() {
                 setProposedType(user.contribution.type);
                 setProposedRate(user.contribution.rate);
             }
-        } catch (error: any) {
+        } catch (error) {
             console.error('Failed to load user data', error);
-            setError(error.response?.data?.error || 'Failed to load user data. Please try again later.');
+            setError('Failed to load user data. Please try again later.');
         } finally {
             setLoading(false);
         }
     };
 
-    const loadYTDData = async () => {
+    const loadYTDAndHistory = async () => {
         try {
             const result = await api.getYTD();
             setYtdData(result);
-        } catch (error) {
-            console.error('Failed to fetch YTD data', error);
-        } finally {
-            setYtdLoading(false);
-        }
-    };
 
-    const loadHistory = async () => {
-        try {
-            const result = await api.getYTD();
-            const sortedHistory = result.history.sort((a: any, b: any) =>
+            const sortedHistory = result.history.sort((a: ContributionHistoryEntry, b: ContributionHistoryEntry) =>
                 new Date(b.date).getTime() - new Date(a.date).getTime()
             );
             setHistory(sortedHistory);
         } catch (error) {
-            console.error('Failed to fetch history', error);
+            console.error('Failed to fetch YTD data and history', error);
         } finally {
+            setYtdLoading(false);
             setHistoryLoading(false);
         }
     };
@@ -94,11 +87,42 @@ export function Dashboard() {
     };
 
     const handleTypeChange = (newType: string) => {
+        const paycheckAmount = salary / payFrequency;
+
+        // Convert between types
+        if (newType === 'PERCENTAGE' && type === 'FIXED') {
+            // Converting from FIXED to PERCENTAGE
+            // Calculate what percentage the fixed amount represents
+            const percentageEquivalent = paycheckAmount > 0 ? (Number(rate) / paycheckAmount) * 100 : 0;
+            const roundedPercentage = Math.round(percentageEquivalent * 100) / 100; // Round to 2 decimals
+            setRate(roundedPercentage);
+            setProposedRate(roundedPercentage);
+        } else if (newType === 'FIXED' && type === 'PERCENTAGE') {
+            // Converting from PERCENTAGE to FIXED
+            // Calculate the dollar amount from the percentage
+            const fixedEquivalent = (Number(rate) / 100) * paycheckAmount;
+            const roundedFixed = Math.round(fixedEquivalent * 100) / 100; // Round to 2 decimals
+            setRate(roundedFixed);
+            setProposedRate(roundedFixed);
+        }
+
         setType(newType);
         setProposedType(newType);
     };
 
     const handleRateChange = (newRate: number | string) => {
+        // Validate percentage doesn't exceed 30% or go below 0%
+        if (type === 'PERCENTAGE') {
+            if (Number(newRate) > 30) {
+                setError('Maximum contribution is 30%');
+                return; // Don't update the rate
+            }
+            if (Number(newRate) < 0) {
+                setError('Contribution cannot be negative');
+                return; // Don't update the rate
+            }
+        }
+
         // Validate fixed amount doesn't exceed 30% of paycheck
         if (type === 'FIXED') {
             const maxAmount = (salary / payFrequency) * 0.3;
@@ -134,7 +158,9 @@ export function Dashboard() {
             handleUpdate();
         } catch (error: any) {
             console.error('Failed to save contribution', error);
-            setError(error.response?.data?.error || 'Failed to save changes. Please try again.');
+            // Show specific backend error message if available
+            const errorMessage = error?.response?.data?.error || 'Failed to save changes. Please try again.';
+            setError(errorMessage);
         } finally {
             setSaving(false);
         }
@@ -189,9 +215,36 @@ export function Dashboard() {
                                 <Box>
                                     <Group justify="space-between" mb="xs">
                                         <Text size="sm" fw={500}>Current Rate</Text>
-                                        <Text fw={700} c="brand-blue">
-                                            {type === 'PERCENTAGE' ? `${rate}%` : `$${rate}`}
-                                        </Text>
+                                        {type === 'PERCENTAGE' && isEditingRate ? (
+                                            <NumberInput
+                                                value={rate}
+                                                onChange={(val) => {
+                                                    handleRateChange(val);
+                                                }}
+                                                onBlur={() => setIsEditingRate(false)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') setIsEditingRate(false);
+                                                }}
+                                                min={0}
+                                                max={30}
+                                                decimalScale={2}
+                                                fixedDecimalScale
+                                                suffix="%"
+                                                size="xs"
+                                                w={80}
+                                                styles={{ input: { fontWeight: 700, color: 'var(--mantine-color-brand-blue-6)', textAlign: 'right' } }}
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <Text
+                                                fw={700}
+                                                c="brand-blue"
+                                                onClick={() => type === 'PERCENTAGE' && setIsEditingRate(true)}
+                                                style={{ cursor: type === 'PERCENTAGE' ? 'pointer' : 'default' }}
+                                            >
+                                                {type === 'PERCENTAGE' ? `${rate}%` : `$${rate}`}
+                                            </Text>
+                                        )}
                                     </Group>
 
                                     {type === 'PERCENTAGE' ? (
@@ -200,7 +253,7 @@ export function Dashboard() {
                                             onChange={handleRateChange}
                                             min={0}
                                             max={30}
-                                            step={1}
+                                            step={0.5}
                                             marks={[
                                                 { value: 0, label: '0%' },
                                                 { value: 15, label: '15%' },
@@ -218,12 +271,18 @@ export function Dashboard() {
                                             fixedDecimalScale
                                             leftSection={<IconCurrencyDollar size="1rem" />}
                                             mb="md"
-                                            error={type === 'FIXED' && (error || (Number(rate) < 0 ? 'Minimum amount is $0' : ''))}
+                                            error={type === 'FIXED' && (error || (Number(rate) < 0 ? 'Amount cannot be negative' : ''))}
                                         />
                                     )}
                                 </Box>
 
-                                <Button fullWidth size="md" onClick={handleSave} loading={saving}>
+                                <Button
+                                    fullWidth
+                                    size="md"
+                                    onClick={handleSave}
+                                    loading={saving}
+                                    disabled={type === 'FIXED' && (Number(rate) < 0 || Number(rate) > (salary / payFrequency) * 0.3)}
+                                >
                                     Update Contribution
                                 </Button>
 
@@ -261,18 +320,10 @@ export function Dashboard() {
                                     <Stack gap="xs">
                                         <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Your Contribution</Text>
                                         <Text size="xl" fw={700}>{currency(ytdData?.totalEmployee || 0).format()}</Text>
-                                        <Group gap={5}>
-                                            <IconArrowUpRight size="1rem" color="green" />
-                                            <Text size="xs" c="green" fw={500}>+12% vs last year</Text>
-                                        </Group>
                                     </Stack>
                                     <Stack gap="xs">
                                         <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Employer Match</Text>
                                         <Text size="xl" fw={700}>{currency(ytdData?.totalEmployer || 0).format()}</Text>
-                                        <Group gap={5}>
-                                            <IconArrowUpRight size="1rem" color="green" />
-                                            <Text size="xs" c="green" fw={500}>+5% vs last year</Text>
-                                        </Group>
                                     </Stack>
                                 </SimpleGrid>
                             </>

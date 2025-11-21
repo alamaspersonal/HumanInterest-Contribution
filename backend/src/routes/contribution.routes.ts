@@ -1,6 +1,6 @@
 import express from 'express';
 import { prisma } from '../index';
-import { ContributionHistory } from '@prisma/client';
+import type { ContributionHistory } from '@prisma/client';
 import { CalculationService } from '../services/calculation.service';
 
 const router = express.Router();
@@ -27,6 +27,7 @@ router.get('/user', async (req, res) => {
 
         res.json(user);
     } catch (error) {
+        console.error('Failed to fetch user:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -47,6 +48,24 @@ router.post('/contribution', async (req, res) => {
 
         // General validation for all types
         if (rate === undefined || rate < 0) return res.status(400).json({ error: 'Invalid contribution rate' });
+
+        // For fixed contributions, validate 30% limit
+        if (type === 'FIXED') {
+            const user = await prisma.user.findUnique({
+                where: { id: userId }
+            });
+
+            if (!user) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            const maxAmount = (user.salary / user.payFrequency) * 0.3;
+            if (rate > maxAmount) {
+                return res.status(400).json({
+                    error: `Fixed contribution amount cannot exceed ${maxAmount.toFixed(2)} (30% of your paycheck)`
+                });
+            }
+        }
 
         const contribution = await prisma.contribution.update({
             where: { userId },
@@ -80,6 +99,7 @@ router.get('/contribution/ytd', async (req, res) => {
             history
         });
     } catch (error) {
+        console.error('Failed to fetch YTD data:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -97,6 +117,7 @@ router.put('/user/:id', async (req, res) => {
 
         res.json(user);
     } catch (error) {
+        console.error('Failed to update user:', error);
         res.status(500).json({ error: 'Failed to update user' });
     }
 });
@@ -112,6 +133,7 @@ router.delete('/contribution/history/:userId', async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
+        console.error('Failed to clear history:', error);
         res.status(500).json({ error: 'Failed to clear history' });
     }
 });
@@ -152,6 +174,7 @@ router.post('/contribution/calculate-impact', async (req, res) => {
             projection
         });
     } catch (error) {
+        console.error('Impact calculation failed:', error);
         res.status(500).json({ error: 'Calculation failed' });
     }
 });

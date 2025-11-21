@@ -62,18 +62,19 @@ describe('Contribution Routes', () => {
 
     describe('POST /api/contribution', () => {
         it('should update contribution successfully', async () => {
-            const updateData = {
-                userId: 1,
-                type: 'FIXED',
-                rate: 500,
-            };
+            const updateData = { userId: 1, type: 'PERCENTAGE', rate: 10 };
+            const updatedContribution = { id: 1, userId: 1, type: 'PERCENTAGE', rate: 10 };
 
-            const updatedContribution = {
+            // Mock user lookup (for validation)
+            mockPrisma.user.findUnique.mockResolvedValue({
                 id: 1,
-                userId: 1,
-                type: 'FIXED',
-                rate: 500,
-            };
+                email: 'test@test.com',
+                name: 'Test User',
+                salary: 100000,
+                payFrequency: 26,
+                birthDate: new Date('1990-01-01'),
+                retirementAge: 65
+            });
 
             mockPrisma.contribution.update.mockResolvedValue(updatedContribution);
 
@@ -85,7 +86,7 @@ describe('Contribution Routes', () => {
             expect(res.body).toEqual(updatedContribution);
             expect(mockPrisma.contribution.update).toHaveBeenCalledWith({
                 where: { userId: 1 },
-                data: { type: 'FIXED', rate: 500 },
+                data: { type: 'PERCENTAGE', rate: 10 },
             });
         });
 
@@ -119,6 +120,30 @@ describe('Contribution Routes', () => {
             expect(res.status).toBe(400);
             expect(res.body).toHaveProperty('error');
             expect(res.body.error).toMatch(/negative/i);
+        });
+
+        // Edge case: Fixed amount exceeds 30% of paycheck
+        it('should return 400 when fixed amount exceeds 30% of paycheck', async () => {
+            // Mock user with $100,000 salary, bi-weekly (26 pay periods)
+            // Paycheck = $100,000 / 26 = $3,846.15
+            // 30% limit = $3,846.15 * 0.3 = $1,153.85
+            mockPrisma.user.findUnique.mockResolvedValue({
+                id: 1,
+                email: 'test@test.com',
+                name: 'Test User',
+                salary: 100000,
+                payFrequency: 26,
+                birthDate: new Date('1990-01-01'),
+                retirementAge: 65
+            });
+
+            const res = await request(app)
+                .post('/api/contribution')
+                .send({ userId: 1, type: 'FIXED', rate: 2000 }); // Exceeds 30% limit
+
+            expect(res.status).toBe(400);
+            expect(res.body).toHaveProperty('error');
+            expect(res.body.error).toMatch(/30%/);
         });
     });
 });
