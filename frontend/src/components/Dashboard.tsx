@@ -1,17 +1,115 @@
-import { SimpleGrid, Title, Text, Box } from '@mantine/core';
-import { ContributionWidget } from './ContributionWidget';
-import { YTDWidget } from './YTDWidget';
+import { Card, Title, Text, Box, Stack, Divider, SimpleGrid, Group, SegmentedControl, Slider, NumberInput, Button, LoadingOverlay, Notification, ThemeIcon, Table, Pagination, Skeleton } from '@mantine/core';
+import { IconCurrencyDollar, IconPercentage, IconCheck, IconChartPie, IconArrowUpRight } from '@tabler/icons-react';
+import { useState, useEffect } from 'react';
+import { api } from '../services/api';
+import currency from 'currency.js';
 import { ImpactWidget } from './ImpactWidget';
-import { useState } from 'react';
 
 export function Dashboard() {
     const [refreshKey, setRefreshKey] = useState(0);
     const [proposedRate, setProposedRate] = useState<number | string>(5);
     const [proposedType, setProposedType] = useState<string>('PERCENTAGE');
 
+    // Contribution widget state
+    const [userId, setUserId] = useState<number | null>(null);
+    const [type, setType] = useState('PERCENTAGE');
+    const [rate, setRate] = useState<number | string>(5);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
+
+    // YTD widget state
+    const [ytdData, setYtdData] = useState<any>(null);
+    const [ytdLoading, setYtdLoading] = useState(true);
+
+    // History state
+    const [history, setHistory] = useState<any[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const itemsPerPage = 5;
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    useEffect(() => {
+        loadYTDData();
+        loadHistory();
+    }, [refreshKey]);
+
+    const loadData = async () => {
+        try {
+            const user = await api.getUser();
+            setUserId(user.id);
+            if (user.contribution) {
+                setType(user.contribution.type);
+                setRate(user.contribution.rate);
+                setProposedType(user.contribution.type);
+                setProposedRate(user.contribution.rate);
+            }
+        } catch (error) {
+            console.error('Failed to load user data', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadYTDData = async () => {
+        try {
+            const result = await api.getYTD();
+            setYtdData(result);
+        } catch (error) {
+            console.error('Failed to fetch YTD data', error);
+        } finally {
+            setYtdLoading(false);
+        }
+    };
+
+    const loadHistory = async () => {
+        try {
+            const result = await api.getYTD();
+            const sortedHistory = result.history.sort((a: any, b: any) =>
+                new Date(b.date).getTime() - new Date(a.date).getTime()
+            );
+            setHistory(sortedHistory);
+        } catch (error) {
+            console.error('Failed to fetch history', error);
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
     const handleUpdate = () => {
         setRefreshKey(prev => prev + 1);
     };
+
+    const handleTypeChange = (newType: string) => {
+        setType(newType);
+        setProposedType(newType);
+    };
+
+    const handleRateChange = (newRate: number | string) => {
+        setRate(newRate);
+        setProposedRate(newRate);
+    };
+
+    const handleSave = async () => {
+        if (!userId) return;
+        setSaving(true);
+        try {
+            await api.updateContribution(userId, type, Number(rate));
+            setShowSuccess(true);
+            setTimeout(() => setShowSuccess(false), 3000);
+            handleUpdate();
+        } catch (error) {
+            console.error('Failed to save contribution', error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const totalPages = Math.ceil(history.length / itemsPerPage);
+    const paginatedData = history.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
     return (
         <Box>
@@ -20,23 +118,175 @@ export function Dashboard() {
                 <Text c="dimmed">Here's an overview of your retirement savings.</Text>
             </Box>
 
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-                <ContributionWidget
-                    onUpdate={handleUpdate}
-                    onRateChange={setProposedRate}
-                    onTypeChange={setProposedType}
-                />
-                <Box>
-                    <SimpleGrid cols={1} spacing="lg">
-                        <YTDWidget refreshKey={refreshKey} />
-                        <ImpactWidget
-                            refreshKey={refreshKey}
-                            proposedRate={Number(proposedRate)}
-                            proposedType={proposedType}
-                        />
+            <Card padding="xl" radius="lg" withBorder>
+                <Stack gap="xl">
+                    {/* Graph & Contribution Controls - Always visible together */}
+                    <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="xl">
+                        {/* Projected Savings Graph */}
+                        <Box>
+                            <ImpactWidget
+                                refreshKey={refreshKey}
+                                proposedRate={Number(proposedRate)}
+                                proposedType={proposedType}
+                            />
+                        </Box>
+
+                        {/* Contribution Controls */}
+                        <Box pos="relative">
+                            <LoadingOverlay visible={loading} overlayProps={{ radius: "sm", blur: 2 }} />
+
+                            <Group justify="space-between" mb="md">
+                                <Text fw={700} size="lg">Contribution Rate</Text>
+                                <ThemeIcon variant="light" color="brand-blue" size="lg" radius="md">
+                                    <IconPercentage size="1.2rem" />
+                                </ThemeIcon>
+                            </Group>
+
+                            <Stack gap="lg">
+                                <SegmentedControl
+                                    value={type}
+                                    onChange={handleTypeChange}
+                                    data={[
+                                        { label: 'Percentage (%)', value: 'PERCENTAGE' },
+                                        { label: 'Fixed Amount ($)', value: 'FIXED' },
+                                    ]}
+                                    fullWidth
+                                    radius="md"
+                                />
+
+                                <Box>
+                                    <Group justify="space-between" mb="xs">
+                                        <Text size="sm" fw={500}>Current Rate</Text>
+                                        <Text fw={700} c="brand-blue">
+                                            {type === 'PERCENTAGE' ? `${rate}%` : `$${rate}`}
+                                        </Text>
+                                    </Group>
+
+                                    {type === 'PERCENTAGE' ? (
+                                        <Slider
+                                            value={typeof rate === 'number' ? rate : 0}
+                                            onChange={handleRateChange}
+                                            min={0}
+                                            max={30}
+                                            step={1}
+                                            marks={[
+                                                { value: 0, label: '0%' },
+                                                { value: 15, label: '15%' },
+                                                { value: 30, label: '30%' },
+                                            ]}
+                                            mb="md"
+                                        />
+                                    ) : (
+                                        <NumberInput
+                                            value={rate}
+                                            onChange={handleRateChange}
+                                            min={0}
+                                            leftSection={<IconCurrencyDollar size="1rem" />}
+                                            mb="md"
+                                        />
+                                    )}
+                                </Box>
+
+                                <Button fullWidth size="md" onClick={handleSave} loading={saving}>
+                                    Update Contribution
+                                </Button>
+
+                                {showSuccess && (
+                                    <Notification icon={<IconCheck size="1.1rem" />} color="teal" title="Success" onClose={() => setShowSuccess(false)}>
+                                        Contribution updated successfully
+                                    </Notification>
+                                )}
+                            </Stack>
+                        </Box>
                     </SimpleGrid>
-                </Box>
-            </SimpleGrid>
+
+                    <Divider />
+
+                    {/* YTD Performance */}
+                    <Box>
+                        {ytdLoading ? (
+                            <Stack>
+                                <Skeleton height={30} width="50%" />
+                                <SimpleGrid cols={2}>
+                                    <Skeleton height={80} />
+                                    <Skeleton height={80} />
+                                </SimpleGrid>
+                            </Stack>
+                        ) : (
+                            <>
+                                <Group justify="space-between" mb="xl">
+                                    <Text fw={700} size="lg">YTD Performance</Text>
+                                    <ThemeIcon variant="light" color="green" size="lg" radius="md">
+                                        <IconChartPie size="1.2rem" />
+                                    </ThemeIcon>
+                                </Group>
+
+                                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
+                                    <Stack gap="xs">
+                                        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Your Contribution</Text>
+                                        <Text size="xl" fw={700}>{currency(ytdData?.totalEmployee || 0).format()}</Text>
+                                        <Group gap={5}>
+                                            <IconArrowUpRight size="1rem" color="green" />
+                                            <Text size="xs" c="green" fw={500}>+12% vs last year</Text>
+                                        </Group>
+                                    </Stack>
+                                    <Stack gap="xs">
+                                        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Employer Match</Text>
+                                        <Text size="xl" fw={700}>{currency(ytdData?.totalEmployer || 0).format()}</Text>
+                                        <Group gap={5}>
+                                            <IconArrowUpRight size="1rem" color="green" />
+                                            <Text size="xs" c="green" fw={500}>+5% vs last year</Text>
+                                        </Group>
+                                    </Stack>
+                                </SimpleGrid>
+                            </>
+                        )}
+                    </Box>
+
+                    <Divider />
+
+                    {/* Contribution History */}
+                    <Box>
+                        {historyLoading ? (
+                            <Stack>
+                                <Skeleton height={30} width="40%" />
+                                <Skeleton height={200} />
+                            </Stack>
+                        ) : (
+                            <>
+                                <Text fw={700} size="lg" mb="md">Contribution History</Text>
+
+                                <Table>
+                                    <Table.Thead>
+                                        <Table.Tr>
+                                            <Table.Th>Date</Table.Th>
+                                            <Table.Th>You Contributed</Table.Th>
+                                            <Table.Th>Employer Match</Table.Th>
+                                            <Table.Th>Total</Table.Th>
+                                        </Table.Tr>
+                                    </Table.Thead>
+                                    <Table.Tbody>
+                                        {paginatedData.map((entry) => (
+                                            <Table.Tr key={entry.id}>
+                                                <Table.Td>{new Date(entry.date).toLocaleDateString()}</Table.Td>
+                                                <Table.Td>{currency(entry.amount).format()}</Table.Td>
+                                                <Table.Td>{currency(entry.employerMatch).format()}</Table.Td>
+                                                <Table.Td fw={500}>{currency(entry.amount + entry.employerMatch).format()}</Table.Td>
+                                            </Table.Tr>
+                                        ))}
+                                    </Table.Tbody>
+                                </Table>
+
+                                {totalPages > 1 && (
+                                    <Group justify="center" mt="md">
+                                        <Pagination total={totalPages} value={page} onChange={setPage} />
+                                    </Group>
+                                )}
+                            </>
+                        )}
+                    </Box>
+                </Stack>
+            </Card>
         </Box>
     );
 }

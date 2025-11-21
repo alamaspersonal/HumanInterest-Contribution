@@ -95,7 +95,7 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
     const tooltipBorder = isDark ? '#373A40' : '#e9ecef';
 
     return (
-        <Card padding="lg" radius="md" withBorder>
+        <Box>
             <Group justify="space-between" mb="md">
                 <Box>
                     <Text fw={700} size="lg">Projected Savings</Text>
@@ -190,6 +190,6 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
             <Text size="sm" c="dimmed" mt="md" ta="center">
                 Move the slider to see how changes affect your retirement savings.
             </Text>
-        </Card>
+        </Box>
     );
 }
