@@ -20,6 +20,7 @@ export function Dashboard() {
     const [error, setError] = useState<string>('');
     const [salary, setSalary] = useState<number>(0);
     const [payFrequency, setPayFrequency] = useState<number>(26);
+    const [userName, setUserName] = useState<string>('User');
 
     // YTD widget state
     const [ytdData, setYtdData] = useState<any>(null);
@@ -46,6 +47,9 @@ export function Dashboard() {
             setUserId(user.id);
             setSalary(user.salary);
             setPayFrequency(user.payFrequency);
+            // Extract first name for welcome message
+            const firstName = user.name.split(' ')[0];
+            setUserName(firstName);
             if (user.contribution) {
                 setType(user.contribution.type);
                 setRate(user.contribution.rate);
@@ -140,7 +144,7 @@ export function Dashboard() {
     return (
         <Box>
             <Box mb="xl">
-                <Title order={2}>Welcome Back, Alex</Title>
+                <Title order={2}>Welcome Back, {userName}</Title>
                 <Text c="dimmed">Here's an overview of your retirement savings.</Text>
             </Box>
 

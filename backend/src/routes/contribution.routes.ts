@@ -8,10 +8,17 @@ const router = express.Router();
 router.get('/user', async (req, res) => {
     try {
         // In a real app, we'd get userId from auth token
-        // For demo, we fetch the first user (seeded user)
-        const user = await prisma.user.findFirst({
-            include: { contribution: true }
-        });
+        // For demo, we fetch user by email from env variable or first user
+        const demoUserEmail = process.env.DEMO_USER_EMAIL;
+
+        const user = demoUserEmail
+            ? await prisma.user.findUnique({
+                where: { email: demoUserEmail },
+                include: { contribution: true }
+            })
+            : await prisma.user.findFirst({
+                include: { contribution: true }
+            });
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });

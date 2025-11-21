@@ -56,10 +56,40 @@ The project uses a monorepo structure:
 - `/backend`: Express server with Prisma ORM and business logic
 - `/frontend`: React application with Vite build tool
 
-## Mock Data
+## Demo User Profiles
 
-The application is seeded with the following demo user:
-- **Salary**: $75,000/year
-- **Pay Frequency**: Bi-weekly (26 paychecks)
-- **Employer Match**: 50% match up to 6% of salary
-- **Return Rate**: 7% annual growth
+The application is seeded with **four demo users** with different financial profiles:
+
+| Name | Email | Salary | Age |
+|------|-------|--------|-----|
+| Alex Lewis | alex.lewis@company.com | $75,000 | 29
+| Jordan Chen | jordan.chen@company.com | $120,000 | 39
+| Sam Patel | sam.patel@company.com | $45,000 | 24
+| Morgan Taylor | morgan.taylor@company.com | $95,000 | 46
+
+### Switching Between Users
+
+To test different user profiles **without exposing this functionality to the frontend**:
+
+1. **Create a `.env` file** in the `backend/` directory (or copy from `.env.example`):
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
+
+2. **Set the user email** in `backend/.env`:
+   ```
+   DEMO_USER_EMAIL=jordan.chen@company.com
+   ```
+
+3. **Restart the backend server** for changes to take effect:
+   ```bash
+   npm run dev
+   ```
+
+> **Note**: If `DEMO_USER_EMAIL` is not set, the application defaults to the first user (Alex Lewis).
+
+### Employer Match Details
+
+- **Match Rate**: 50% of employee contribution
+- **Match Cap**: Up to 3% of salary
+- **Annual Return**: 7% growth rate (used for projections)
