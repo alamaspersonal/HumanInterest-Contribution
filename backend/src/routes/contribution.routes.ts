@@ -89,8 +89,14 @@ router.get('/contribution/ytd', async (req, res) => {
             where: { userId: user.id }
         });
 
-        const totalEmployee = history.reduce((sum: number, entry: ContributionHistory) => sum + entry.amount, 0);
-        const totalEmployer = history.reduce((sum: number, entry: ContributionHistory) => sum + entry.employerMatch, 0);
+        const currentYear = new Date().getFullYear();
+        const currentYearHistory = history.filter(entry => {
+            const entryDate = new Date(entry.date);
+            return entryDate.getFullYear() === currentYear;
+        });
+
+        const totalEmployee = currentYearHistory.reduce((sum: number, entry: ContributionHistory) => sum + entry.amount, 0);
+        const totalEmployer = currentYearHistory.reduce((sum: number, entry: ContributionHistory) => sum + entry.employerMatch, 0);
 
         res.json({
             totalEmployee,

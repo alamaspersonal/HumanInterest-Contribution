@@ -76,10 +76,13 @@ async function main() {
         const startYear = Math.max(2015, yearUserTurned22);
 
         const startDate = new Date(startYear, 0, 1); // January 1st of start year
-        const yearsOfHistory = currentDate.getFullYear() - startYear;
 
-        const numPaychecks = Math.round(yearsOfHistory * userData.payFrequency);
+        // Calculate total days from start date to today
+        const timeDiff = currentDate.getTime() - startDate.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
         const daysPerPaycheck = userData.payFrequency === 26 ? 14 : 15;
+        const numPaychecks = Math.floor(daysDiff / daysPerPaycheck);
 
         // Simulate contribution rate changes over time
         let currentRate = Math.max(1, userData.contributionRate - 3); // Started lower

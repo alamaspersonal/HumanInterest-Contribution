@@ -224,11 +224,11 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
                 </ResponsiveContainer>
             </Box>
 
-            <Text size="xs" c="dimmed" mt="md" ta="center" fs="italic">
-                Projections assume 3% inflation and 7% annual return based on <Anchor href="https://www.dol.gov/agencies/ebsa/laws-and-regulations/rules-and-regulations/advanced-notices-of-proposed-rulemaking/lifetime-income-calculator" target="_blank" inherit>Employee Benefits Security Administration's (EBSA) suggestion for Lifetime Income Illustrations</Anchor>.
-            </Text>
-            <Text size="sm" c="dimmed" mt={4} ta="center">
+            <Text size="sm" c="dimmed" mt="md" ta="center">
                 Move the slider to see how changes affect your retirement savings.
+            </Text>
+            <Text size="xs" c="dimmed" mt={4} ta="center" fs="italic">
+                Projections assume 3% inflation and 7% annual return based on <Anchor href="https://www.dol.gov/agencies/ebsa/laws-and-regulations/rules-and-regulations/advanced-notices-of-proposed-rulemaking/lifetime-income-calculator" target="_blank" inherit>Employee Benefits Security Administration's (EBSA) suggestion for Lifetime Income Illustrations</Anchor>.
             </Text>
         </Box>
     );
