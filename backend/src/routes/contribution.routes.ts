@@ -49,7 +49,7 @@ router.post('/contribution', async (req, res) => {
         // General validation for all types
         if (rate === undefined || rate < 0) return res.status(400).json({ error: 'Invalid contribution rate' });
 
-        // For fixed contributions, validate 30% limit
+        // For fixed contributions, validate 100% limit (cannot exceed paycheck)
         if (type === 'FIXED') {
             const user = await prisma.user.findUnique({
                 where: { id: userId }
@@ -59,10 +59,10 @@ router.post('/contribution', async (req, res) => {
                 return res.status(404).json({ error: 'User not found' });
             }
 
-            const maxAmount = (user.salary / user.payFrequency) * 0.3;
+            const maxAmount = user.salary / user.payFrequency;
             if (rate > maxAmount) {
                 return res.status(400).json({
-                    error: `Fixed contribution amount cannot exceed ${maxAmount.toFixed(2)} (30% of your paycheck)`
+                    error: `Fixed contribution amount cannot exceed ${maxAmount.toFixed(2)} (100% of your paycheck)`
                 });
             }
         }

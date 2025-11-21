@@ -122,28 +122,25 @@ describe('Contribution Routes', () => {
             expect(res.body.error).toMatch(/negative/i);
         });
 
-        // Edge case: Fixed amount exceeds 30% of paycheck
-        it('should return 400 when fixed amount exceeds 30% of paycheck', async () => {
-            // Mock user with $100,000 salary, bi-weekly (26 pay periods)
-            // Paycheck = $100,000 / 26 = $3,846.15
-            // 30% limit = $3,846.15 * 0.3 = $1,153.85
+        // Edge case: Fixed amount exceeds 100% of paycheck
+        it('should return 400 when fixed amount exceeds 100% of paycheck', async () => {
+            // Mock user data
             mockPrisma.user.findUnique.mockResolvedValue({
                 id: 1,
-                email: 'test@test.com',
-                name: 'Test User',
                 salary: 100000,
                 payFrequency: 26,
-                birthDate: new Date('1990-01-01'),
-                retirementAge: 65
+                contribution: { type: 'PERCENTAGE', rate: 5 }
             });
 
+            // Paycheck is ~3846.15. 100% is ~3846.15.
+            // Try to contribute 4000
             const res = await request(app)
                 .post('/api/contribution')
-                .send({ userId: 1, type: 'FIXED', rate: 2000 }); // Exceeds 30% limit
+                .send({ userId: 1, type: 'FIXED', rate: 4000 }); // Exceeds 100% limit
 
             expect(res.status).toBe(400);
             expect(res.body).toHaveProperty('error');
-            expect(res.body.error).toMatch(/30%/);
+            expect(res.body.error).toMatch(/100%/);
         });
     });
 });

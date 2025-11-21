@@ -1,4 +1,4 @@
-import { Card, Text, Group, Stack, Box, Skeleton, useComputedColorScheme } from '@mantine/core';
+import { Card, Text, Group, Stack, Box, Skeleton, useComputedColorScheme, Anchor } from '@mantine/core';
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import currency from 'currency.js';
@@ -61,13 +61,13 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
         return () => clearTimeout(timer);
     }, [userId, proposedRate, proposedType]);
 
-    // Fetch maximum projection for Y-axis normalization (30% contribution)
+    // Fetch maximum projection for Y-axis normalization (100% contribution)
     useEffect(() => {
         const fetchMaxProjection = async () => {
             if (!userId) return;
             try {
-                // Calculate maximum potential with 30% contribution
-                const result = await api.calculateImpact(userId, 'PERCENTAGE', 30);
+                // Calculate maximum potential with 100% contribution
+                const result = await api.calculateImpact(userId, 'PERCENTAGE', 100);
                 if (result.projection && result.projection.length > 0) {
                     const maxValue = result.projection[result.projection.length - 1].savings;
                     setMaxProjection(maxValue);
@@ -105,6 +105,7 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
     // Merge data for chart
     const chartData = currentProjection?.map((point, index) => ({
         age: point.age,
+        quarter: (point as any).quarter || 0, // Use quarter from API
         current: point.savings,
         proposed: proposedProjection ? proposedProjection[index]?.savings : point.savings
     })) || [];
@@ -156,6 +157,8 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
                             axisLine={false}
                             tickLine={false}
                             tick={{ fill: axisColor, fontSize: 12 }}
+                            tickFormatter={(val) => `Age ${Math.floor(val)}`}
+                            interval={12} // Show every 3 years (4 quarters * 3) roughly
                         />
                         <YAxis
                             axisLine={false}
@@ -165,15 +168,18 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
                             domain={[0, yDomainMax]}
                         />
                         <Tooltip
-                            content={({ active, payload, label }) => {
+                            content={({ active, payload }) => {
                                 if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
                                     const current = payload[0].value as number;
                                     const proposed = payload[1]?.value as number;
                                     const diff = proposed - current;
+                                    const quarter = data.quarter;
+                                    const age = Math.floor(data.age);
 
                                     return (
                                         <Card padding="xs" radius="md" shadow="sm" withBorder style={{ backgroundColor: tooltipBg, borderColor: tooltipBorder }}>
-                                            <Text size="xs" fw={700} mb={5}>Age {label}</Text>
+                                            <Text size="xs" fw={700} mb={5}>Age {age} {quarter > 0 ? `Q${quarter}` : ''}</Text>
                                             <Group justify="space-between" gap="xl" mb={5}>
                                                 <Text size="xs" c="dimmed">Current:</Text>
                                                 <Text size="xs" fw={500} c="brand-blue">{currency(current, { precision: 0 }).format()}</Text>
@@ -218,7 +224,10 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
                 </ResponsiveContainer>
             </Box>
 
-            <Text size="sm" c="dimmed" mt="md" ta="center">
+            <Text size="xs" c="dimmed" mt="md" ta="center" fs="italic">
+                Projections assume 3% inflation and 7% annual return based on <Anchor href="https://www.dol.gov/agencies/ebsa/laws-and-regulations/rules-and-regulations/advanced-notices-of-proposed-rulemaking/lifetime-income-calculator" target="_blank" inherit>Employee Benefits Security Administration's (EBSA) suggestion for Lifetime Income Illustrations</Anchor>.
+            </Text>
+            <Text size="sm" c="dimmed" mt={4} ta="center">
                 Move the slider to see how changes affect your retirement savings.
             </Text>
         </Box>

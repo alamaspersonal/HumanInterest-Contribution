@@ -111,10 +111,10 @@ export function Dashboard() {
     };
 
     const handleRateChange = (newRate: number | string) => {
-        // Validate percentage doesn't exceed 30% or go below 0%
+        // Validate percentage doesn't exceed 100% or go below 0%
         if (type === 'PERCENTAGE') {
-            if (Number(newRate) > 30) {
-                setError('Maximum contribution is 30%');
+            if (Number(newRate) > 100) {
+                setError('Maximum contribution is 100%');
                 return; // Don't update the rate
             }
             if (Number(newRate) < 0) {
@@ -123,11 +123,11 @@ export function Dashboard() {
             }
         }
 
-        // Validate fixed amount doesn't exceed 30% of paycheck
+        // Validate fixed amount doesn't exceed 100% of paycheck
         if (type === 'FIXED') {
-            const maxAmount = (salary / payFrequency) * 0.3;
+            const maxAmount = salary / payFrequency;
             if (Number(newRate) > maxAmount) {
-                setError(`Maximum contribution is ${currency(maxAmount).format()} (30% of your paycheck)`);
+                setError(`Maximum contribution is ${currency(maxAmount).format()} (100% of your paycheck)`);
                 return; // Don't update the rate
             }
         }
@@ -140,11 +140,11 @@ export function Dashboard() {
     const handleSave = async () => {
         if (!userId) return;
 
-        // Validate fixed amount doesn't exceed 30% of paycheck
+        // Validate fixed amount doesn't exceed 100% of paycheck
         if (type === 'FIXED') {
-            const maxAmount = (salary / payFrequency) * 0.3;
+            const maxAmount = salary / payFrequency;
             if (Number(rate) > maxAmount) {
-                setError(`Maximum contribution is ${currency(maxAmount).format()} (30% of your paycheck)`);
+                setError(`Maximum contribution is ${currency(maxAmount).format()} (100% of your paycheck)`);
                 return;
             }
         }
@@ -226,7 +226,7 @@ export function Dashboard() {
                                                     if (e.key === 'Enter') setIsEditingRate(false);
                                                 }}
                                                 min={0}
-                                                max={30}
+                                                max={100}
                                                 decimalScale={2}
                                                 fixedDecimalScale
                                                 suffix="%"
@@ -234,6 +234,7 @@ export function Dashboard() {
                                                 w={80}
                                                 styles={{ input: { fontWeight: 700, color: 'var(--mantine-color-brand-blue-6)', textAlign: 'right' } }}
                                                 autoFocus
+                                                error={type === 'PERCENTAGE' && (error || (Number(rate) > 100 ? 'Maximum contribution is 100%' : (Number(rate) < 0 ? 'Contribution cannot be negative' : '')))}
                                             />
                                         ) : (
                                             <Text
@@ -252,12 +253,12 @@ export function Dashboard() {
                                             value={typeof rate === 'number' ? rate : 0}
                                             onChange={handleRateChange}
                                             min={0}
-                                            max={30}
+                                            max={100}
                                             step={0.5}
                                             marks={[
                                                 { value: 0, label: '0%' },
-                                                { value: 15, label: '15%' },
-                                                { value: 30, label: '30%' },
+                                                { value: 50, label: '50%' },
+                                                { value: 100, label: '100%' },
                                             ]}
                                             mb="md"
                                         />
@@ -266,7 +267,7 @@ export function Dashboard() {
                                             value={rate}
                                             onChange={handleRateChange}
                                             min={0}
-                                            max={Math.round((salary / payFrequency) * 0.3 * 100) / 100}
+                                            max={Math.round((salary / payFrequency) * 100) / 100}
                                             decimalScale={2}
                                             fixedDecimalScale
                                             leftSection={<IconCurrencyDollar size="1rem" />}
@@ -281,11 +282,13 @@ export function Dashboard() {
                                     size="md"
                                     onClick={handleSave}
                                     loading={saving}
-                                    disabled={type === 'FIXED' && (Number(rate) < 0 || Number(rate) > (salary / payFrequency) * 0.3)}
+                                    disabled={
+                                        (type === 'FIXED' && (Number(rate) < 0 || Number(rate) > (salary / payFrequency))) ||
+                                        (type === 'PERCENTAGE' && (Number(rate) < 0 || Number(rate) > 100))
+                                    }
                                 >
                                     Update Contribution
                                 </Button>
-
                                 {showSuccess && (
                                     <Notification icon={<IconCheck size="1.1rem" />} color="teal" title="Success" onClose={() => setShowSuccess(false)}>
                                         Contribution updated successfully
@@ -374,6 +377,10 @@ export function Dashboard() {
                     </Box>
                 </Stack>
             </Card>
+
+            <Text size="xs" c="dimmed" ta="center" mt="xl" style={{ maxWidth: 600, marginInline: 'auto' }}>
+                This calculator is for hypothetical illustration only and does not enforce IRS 401(k) contribution limits. Future rates of return cannot be predicted with certainty and actual results will vary.
+            </Text>
         </Box>
     );
 }
