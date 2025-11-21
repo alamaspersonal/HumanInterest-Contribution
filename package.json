@@ -1,0 +1,17 @@
+{
+    "name": "human-interest-contribution",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+        "backend",
+        "frontend"
+    ],
+    "scripts": {
+        "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+        "setup": "npm install && npm run setup --workspace=backend",
+        "build": "npm run build --workspaces"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}

@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id              Int      @id @default(autoincrement())
+  email           String   @unique
+  name            String
+  salary          Float    // Annual salary
+  payFrequency    Int      // Number of paychecks per year (e.g., 26 for bi-weekly)
+  birthDate       DateTime
+  retirementAge   Int      @default(65)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  contribution    Contribution?
+  history         ContributionHistory[]
+}
+
+model Contribution {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  user            User     @relation(fields: [userId], references: [id])
+  type            String   // "PERCENTAGE" or "FIXED"
+  rate            Float    // Percentage value (0-100) or Dollar amount
+  updatedAt       DateTime @updatedAt
+}
+
+model ContributionHistory {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
+  date            DateTime
+  amount          Float
+  employerMatch   Float
+  createdAt       DateTime @default(now())
+}
