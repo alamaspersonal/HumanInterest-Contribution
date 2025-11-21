@@ -17,6 +17,9 @@ export function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [error, setError] = useState<string>('');
+    const [salary, setSalary] = useState<number>(0);
+    const [payFrequency, setPayFrequency] = useState<number>(26);
 
     // YTD widget state
     const [ytdData, setYtdData] = useState<any>(null);
@@ -41,6 +44,8 @@ export function Dashboard() {
         try {
             const user = await api.getUser();
             setUserId(user.id);
+            setSalary(user.salary);
+            setPayFrequency(user.payFrequency);
             if (user.contribution) {
                 setType(user.contribution.type);
                 setRate(user.contribution.rate);
@@ -89,13 +94,34 @@ export function Dashboard() {
     };
 
     const handleRateChange = (newRate: number | string) => {
+        // Validate fixed amount doesn't exceed 30% of paycheck
+        if (type === 'FIXED') {
+            const maxAmount = (salary / payFrequency) * 0.3;
+            if (Number(newRate) > maxAmount) {
+                setError(`Maximum contribution is ${currency(maxAmount).format()} (30% of your paycheck)`);
+                return; // Don't update the rate
+            }
+        }
+
         setRate(newRate);
         setProposedRate(newRate);
+        setError(''); // Clear error when user changes value
     };
 
     const handleSave = async () => {
         if (!userId) return;
+
+        // Validate fixed amount doesn't exceed 30% of paycheck
+        if (type === 'FIXED') {
+            const maxAmount = (salary / payFrequency) * 0.3;
+            if (Number(rate) > maxAmount) {
+                setError(`Maximum contribution is ${currency(maxAmount).format()} (30% of your paycheck)`);
+                return;
+            }
+        }
+
         setSaving(true);
+        setError('');
         try {
             await api.updateContribution(userId, type, Number(rate));
             setShowSuccess(true);
@@ -181,8 +207,12 @@ export function Dashboard() {
                                             value={rate}
                                             onChange={handleRateChange}
                                             min={0}
+                                            max={Math.round((salary / payFrequency) * 0.3 * 100) / 100}
+                                            decimalScale={2}
+                                            fixedDecimalScale
                                             leftSection={<IconCurrencyDollar size="1rem" />}
                                             mb="md"
+                                            error={type === 'FIXED' && error}
                                         />
                                     )}
                                 </Box>

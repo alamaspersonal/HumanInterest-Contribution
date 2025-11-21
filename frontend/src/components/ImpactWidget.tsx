@@ -16,6 +16,7 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
     const [salary, setSalary] = useState<number>(0);
     const [loading, setLoading] = useState(true);
     const [userId, setUserId] = useState<number | null>(null);
+    const [maxProjection, setMaxProjection] = useState<number>(0);
     const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
     const isDark = computedColorScheme === 'dark';
 
@@ -60,6 +61,26 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
         return () => clearTimeout(timer);
     }, [userId, proposedRate, proposedType]);
 
+    // Fetch maximum projection for Y-axis normalization (30% contribution)
+    useEffect(() => {
+        const fetchMaxProjection = async () => {
+            if (!userId) return;
+            try {
+                // Calculate maximum potential with 30% contribution
+                const result = await api.calculateImpact(userId, 'PERCENTAGE', 30);
+                if (result.projection && result.projection.length > 0) {
+                    const maxValue = result.projection[result.projection.length - 1].savings;
+                    setMaxProjection(maxValue);
+                }
+            } catch (error) {
+                console.error('Failed to fetch max projection', error);
+                // Fallback to salary-based calculation
+                setMaxProjection(salary * 50);
+            }
+        };
+        fetchMaxProjection();
+    }, [userId, salary]);
+
     if (loading) {
         return (
             <Card padding="lg" radius="md" withBorder h={400}>
@@ -72,8 +93,7 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
     const finalProposed = proposedProjection && proposedProjection.length > 0 ? proposedProjection[proposedProjection.length - 1].savings : 0;
     const difference = finalProposed - finalCurrent;
 
-    // Normalize Y-axis to 50x salary
-    const yDomainMax = salary * 50;
+    const yDomainMax = maxProjection || salary * 50;
 
     const formatYAxis = (value: number) => {
         if (value >= 1000000) {
@@ -100,6 +120,16 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
                 <Box>
                     <Text fw={700} size="lg">Projected Savings</Text>
                     <Text size="sm" c="dimmed">At age 65</Text>
+                    <Group gap="lg" mt="xs">
+                        <Group gap={5}>
+                            <Box w={12} h={12} style={{ backgroundColor: '#0077ff', borderRadius: 2 }} />
+                            <Text size="xs" c="dimmed">Current Plan</Text>
+                        </Group>
+                        <Group gap={5}>
+                            <Box w={12} h={12} style={{ backgroundColor: '#12b886', borderRadius: 2 }} />
+                            <Text size="xs" c="dimmed">Proposed</Text>
+                        </Group>
+                    </Group>
                 </Box>
                 <Stack gap={0} align="flex-end">
                     <Text fw={700} size="xl" c={difference >= 0 ? "teal" : "red"}>
@@ -107,7 +137,8 @@ export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactW
                     </Text>
                     {difference !== 0 && (
                         <Text size="xs" c={difference > 0 ? "teal" : "red"} fw={500}>
-                            {difference > 0 ? '+' : ''}{currency(difference, { precision: 0 }).format()} vs current
+                            {difference > 0 ? '+' : ''}{currency(difference, { precision: 0 }).format()} vs current plan
+
                         </Text>
                     )}
                 </Stack>
