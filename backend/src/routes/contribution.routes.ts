@@ -1,5 +1,6 @@
 import express from 'express';
 import { prisma } from '../index';
+import { ContributionHistory } from '@prisma/client';
 import { CalculationService } from '../services/calculation.service';
 
 const router = express.Router();
@@ -35,6 +36,18 @@ router.post('/contribution', async (req, res) => {
     try {
         const { userId, type, rate } = req.body;
 
+        if (!userId) return res.status(400).json({ error: 'Missing userId' });
+        if (!type) return res.status(400).json({ error: 'Missing contribution type' });
+        if (!['PERCENTAGE', 'FIXED'].includes(type)) return res.status(400).json({ error: 'Invalid contribution type' });
+
+        // Specific validation: prevent negative dollar amounts for fixed contributions
+        if (type === 'FIXED' && rate < 0) {
+            return res.status(400).json({ error: 'Fixed contribution amount cannot be negative' });
+        }
+
+        // General validation for all types
+        if (rate === undefined || rate < 0) return res.status(400).json({ error: 'Invalid contribution rate' });
+
         const contribution = await prisma.contribution.update({
             where: { userId },
             data: { type, rate }
@@ -42,6 +55,7 @@ router.post('/contribution', async (req, res) => {
 
         res.json(contribution);
     } catch (error) {
+        console.error('Update contribution error:', error);
         res.status(500).json({ error: 'Failed to update contribution' });
     }
 });
@@ -56,8 +70,8 @@ router.get('/contribution/ytd', async (req, res) => {
             where: { userId: user.id }
         });
 
-        const totalEmployee = history.reduce((sum, entry) => sum + entry.amount, 0);
-        const totalEmployer = history.reduce((sum, entry) => sum + entry.employerMatch, 0);
+        const totalEmployee = history.reduce((sum: number, entry: ContributionHistory) => sum + entry.amount, 0);
+        const totalEmployer = history.reduce((sum: number, entry: ContributionHistory) => sum + entry.employerMatch, 0);
 
         res.json({
             totalEmployee,
@@ -124,7 +138,7 @@ router.post('/contribution/calculate-impact', async (req, res) => {
         const history = await prisma.contributionHistory.findMany({
             where: { userId: user.id }
         });
-        const currentSavings = history.reduce((sum, h) => sum + h.amount + h.employerMatch, 0);
+        const currentSavings = history.reduce((sum: number, h: ContributionHistory) => sum + h.amount + h.employerMatch, 0);
 
         const projection = CalculationService.calculateProjection(
             new Date().getFullYear() - user.birthDate.getFullYear(),

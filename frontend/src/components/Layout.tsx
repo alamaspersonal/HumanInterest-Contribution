@@ -33,7 +33,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Group h="100%" px="md" justify="space-between">
                     <Group gap="xs">
                         <IconCoin size={30} color="#0077ff" />
-                        <Text fw={700} size="xl" c="brand-navy.5">RetireSmart</Text>
+                        <Text fw={700} size="xl" c={computedColorScheme === 'dark' ? '#0077ff' : 'brand-navy.5'}>RetireSmart</Text>
                     </Group>
                     <Group>
                         <ActionIcon

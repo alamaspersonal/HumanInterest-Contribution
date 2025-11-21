@@ -7,6 +7,11 @@ export class CalculationService {
         type: string,
         rate: number
     ): { employee: number; employer: number } {
+        if (salary < 0) throw new Error('Salary must be non-negative');
+        if (payFrequency <= 0) throw new Error('Pay frequency must be positive');
+        if (rate < 0) throw new Error('Contribution rate must be non-negative');
+        if (!['PERCENTAGE', 'FIXED'].includes(type)) throw new Error('Invalid contribution type');
+
         const grossPay = currency(salary).divide(payFrequency);
 
         let employeeContribution;
@@ -38,6 +43,10 @@ export class CalculationService {
         annualContribution: number,
         annualReturnRate: number = 0.07
     ): Array<{ age: number; savings: number }> {
+        if (retirementAge <= currentAge) throw new Error('Retirement age must be greater than current age');
+        if (currentSavings < 0) throw new Error('Current savings must be non-negative');
+        if (annualContribution < 0) throw new Error('Annual contribution must be non-negative');
+
         const years = retirementAge - currentAge;
         const projection = [];
         let balance = currency(currentSavings);

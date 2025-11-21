@@ -56,8 +56,9 @@ export function Dashboard() {
                 setProposedType(user.contribution.type);
                 setProposedRate(user.contribution.rate);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to load user data', error);
+            setError(error.response?.data?.error || 'Failed to load user data. Please try again later.');
         } finally {
             setLoading(false);
         }
@@ -131,8 +132,9 @@ export function Dashboard() {
             setShowSuccess(true);
             setTimeout(() => setShowSuccess(false), 3000);
             handleUpdate();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to save contribution', error);
+            setError(error.response?.data?.error || 'Failed to save changes. Please try again.');
         } finally {
             setSaving(false);
         }
@@ -216,7 +218,7 @@ export function Dashboard() {
                                             fixedDecimalScale
                                             leftSection={<IconCurrencyDollar size="1rem" />}
                                             mb="md"
-                                            error={type === 'FIXED' && error}
+                                            error={type === 'FIXED' && (error || (Number(rate) < 0 ? 'Minimum amount is $0' : ''))}
                                         />
                                     )}
                                 </Box>
