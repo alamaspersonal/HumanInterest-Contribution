@@ -1,5 +1,4 @@
-import { Card, Text, Group, ThemeIcon, Stack, Box, Skeleton } from '@mantine/core';
-import { IconTrendingUp } from '@tabler/icons-react';
+import { Card, Text, Group, Stack, Box, Skeleton, useComputedColorScheme } from '@mantine/core';
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import currency from 'currency.js';
@@ -7,32 +6,59 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 interface ImpactWidgetProps {
     refreshKey?: number;
+    proposedRate?: number;
+    proposedType?: string;
 }
 
-export function ImpactWidget({ refreshKey }: ImpactWidgetProps) {
-    const [projection, setProjection] = useState<Array<{ age: number; savings: number }> | null>(null);
+export function ImpactWidget({ refreshKey, proposedRate, proposedType }: ImpactWidgetProps) {
+    const [currentProjection, setCurrentProjection] = useState<Array<{ age: number; savings: number }> | null>(null);
+    const [proposedProjection, setProposedProjection] = useState<Array<{ age: number; savings: number }> | null>(null);
     const [salary, setSalary] = useState<number>(0);
     const [loading, setLoading] = useState(true);
+    const [userId, setUserId] = useState<number | null>(null);
+    const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
+    const isDark = computedColorScheme === 'dark';
 
+    // Fetch initial user data and current projection
     useEffect(() => {
-        const fetchImpact = async () => {
+        const fetchInitialData = async () => {
             try {
                 const user = await api.getUser();
                 if (user) {
+                    setUserId(user.id);
                     setSalary(user.salary);
                     if (user.contribution) {
                         const result = await api.calculateImpact(user.id, user.contribution.type, user.contribution.rate);
-                        setProjection(result.projection);
+                        setCurrentProjection(result.projection);
+                        // Initialize proposed projection to match current
+                        setProposedProjection(result.projection);
                     }
                 }
             } catch (error) {
-                console.error('Failed to fetch impact', error);
+                console.error('Failed to fetch initial data', error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchImpact();
+        fetchInitialData();
     }, [refreshKey]);
+
+    // Fetch proposed projection when props change
+    useEffect(() => {
+        const fetchProposed = async () => {
+            if (!userId || proposedRate === undefined || !proposedType) return;
+            try {
+                const result = await api.calculateImpact(userId, proposedType, proposedRate);
+                setProposedProjection(result.projection);
+            } catch (error) {
+                console.error('Failed to fetch proposed impact', error);
+            }
+        };
+
+        // Debounce slightly to avoid too many requests while sliding
+        const timer = setTimeout(fetchProposed, 200);
+        return () => clearTimeout(timer);
+    }, [userId, proposedRate, proposedType]);
 
     if (loading) {
         return (
@@ -42,8 +68,11 @@ export function ImpactWidget({ refreshKey }: ImpactWidgetProps) {
         );
     }
 
-    const finalAmount = projection && projection.length > 0 ? projection[projection.length - 1].savings : 0;
-    // Normalize Y-axis to 50x salary to provide a stable frame of reference
+    const finalCurrent = currentProjection && currentProjection.length > 0 ? currentProjection[currentProjection.length - 1].savings : 0;
+    const finalProposed = proposedProjection && proposedProjection.length > 0 ? proposedProjection[proposedProjection.length - 1].savings : 0;
+    const difference = finalProposed - finalCurrent;
+
+    // Normalize Y-axis to 50x salary
     const yDomainMax = salary * 50;
 
     const formatYAxis = (value: number) => {
@@ -53,6 +82,18 @@ export function ImpactWidget({ refreshKey }: ImpactWidgetProps) {
         return `$${(value / 1000).toFixed(0)}k`;
     };
 
+    // Merge data for chart
+    const chartData = currentProjection?.map((point, index) => ({
+        age: point.age,
+        current: point.savings,
+        proposed: proposedProjection ? proposedProjection[index]?.savings : point.savings
+    })) || [];
+
+    const axisColor = isDark ? '#909296' : '#9b9fa8';
+    const gridColor = isDark ? '#373A40' : '#e9ecef';
+    const tooltipBg = isDark ? '#25262b' : '#fff';
+    const tooltipBorder = isDark ? '#373A40' : '#e9ecef';
+
     return (
         <Card padding="lg" radius="md" withBorder>
             <Group justify="space-between" mb="md">
@@ -61,56 +102,93 @@ export function ImpactWidget({ refreshKey }: ImpactWidgetProps) {
                     <Text size="sm" c="dimmed">At age 65</Text>
                 </Box>
                 <Stack gap={0} align="flex-end">
-                    <Text fw={700} size="xl" c="brand-blue">{currency(finalAmount, { precision: 0 }).format()}</Text>
-                    <ThemeIcon variant="light" color="brand-blue" size="md" radius="md">
-                        <IconTrendingUp size="1rem" />
-                    </ThemeIcon>
+                    <Text fw={700} size="xl" c={difference >= 0 ? "teal" : "red"}>
+                        {currency(finalProposed, { precision: 0 }).format()}
+                    </Text>
+                    {difference !== 0 && (
+                        <Text size="xs" c={difference > 0 ? "teal" : "red"} fw={500}>
+                            {difference > 0 ? '+' : ''}{currency(difference, { precision: 0 }).format()} vs current
+                        </Text>
+                    )}
                 </Stack>
             </Group>
 
             <Box h={300} mt="lg">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
-                        data={projection || []}
-                        margin={{
-                            top: 10,
-                            right: 30,
-                            left: 0,
-                            bottom: 0,
-                        }}
+                        data={chartData}
+                        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                     >
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
                         <XAxis
                             dataKey="age"
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#9b9fa8', fontSize: 12 }}
+                            tick={{ fill: axisColor, fontSize: 12 }}
                         />
                         <YAxis
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#9b9fa8', fontSize: 12 }}
+                            tick={{ fill: axisColor, fontSize: 12 }}
                             tickFormatter={formatYAxis}
                             domain={[0, yDomainMax]}
                         />
                         <Tooltip
-                            formatter={(value: number) => [currency(value, { precision: 0 }).format(), 'Savings']}
-                            labelFormatter={(label) => `Age ${label}`}
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+                            content={({ active, payload, label }) => {
+                                if (active && payload && payload.length) {
+                                    const current = payload[0].value as number;
+                                    const proposed = payload[1]?.value as number;
+                                    const diff = proposed - current;
+
+                                    return (
+                                        <Card padding="xs" radius="md" shadow="sm" withBorder style={{ backgroundColor: tooltipBg, borderColor: tooltipBorder }}>
+                                            <Text size="xs" fw={700} mb={5}>Age {label}</Text>
+                                            <Group justify="space-between" gap="xl" mb={5}>
+                                                <Text size="xs" c="dimmed">Current:</Text>
+                                                <Text size="xs" fw={500} c="brand-blue">{currency(current, { precision: 0 }).format()}</Text>
+                                            </Group>
+                                            <Group justify="space-between" gap="xl" mb={5}>
+                                                <Text size="xs" c="dimmed">Proposed:</Text>
+                                                <Text size="xs" fw={500} c="teal">{currency(proposed, { precision: 0 }).format()}</Text>
+                                            </Group>
+                                            {diff !== 0 && (
+                                                <Group justify="space-between" gap="xl">
+                                                    <Text size="xs" c="dimmed">Difference:</Text>
+                                                    <Text size="xs" fw={700} c={diff > 0 ? "teal" : "red"}>
+                                                        {diff > 0 ? '+' : ''}{currency(diff, { precision: 0 }).format()}
+                                                    </Text>
+                                                </Group>
+                                            )}
+                                        </Card>
+                                    );
+                                }
+                                return null;
+                            }}
                         />
                         <Area
                             type="monotone"
-                            dataKey="savings"
+                            dataKey="current"
                             stroke="#0077ff"
-                            fill="#e5f4ff"
+                            fill="#0077ff"
+                            fillOpacity={0.1}
                             strokeWidth={2}
+                            name="Current"
+                        />
+                        <Area
+                            type="monotone"
+                            dataKey="proposed"
+                            stroke="#12b886"
+                            fill="#12b886"
+                            fillOpacity={0.2}
+                            strokeWidth={2}
+                            name="Proposed"
                         />
                     </AreaChart>
                 </ResponsiveContainer>
             </Box>
 
             <Text size="sm" c="dimmed" mt="md" ta="center">
-                This projection assumes a 7% annual return. Actual results will vary.
+                Move the slider to see how changes affect your retirement savings.
             </Text>
         </Card>
     );

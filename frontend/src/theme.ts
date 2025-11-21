@@ -65,7 +65,7 @@ export const theme = createTheme({
             },
             styles: {
                 input: {
-                    backgroundColor: '#f8f9fa',
+                    backgroundColor: 'var(--mantine-color-body)',
                 },
             },
         },
@@ -76,7 +76,7 @@ export const theme = createTheme({
             },
             styles: {
                 input: {
-                    backgroundColor: '#f8f9fa',
+                    backgroundColor: 'var(--mantine-color-body)',
                 },
             },
         },
