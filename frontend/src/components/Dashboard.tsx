@@ -313,7 +313,7 @@ export function Dashboard() {
                         ) : (
                             <>
                                 <Group justify="space-between" mb="xl">
-                                    <Text fw={700} size="lg">YTD Performance</Text>
+                                    <Text fw={700} size="lg">YTD Contributions</Text>
                                     <ThemeIcon variant="light" color="green" size="lg" radius="md">
                                         <IconChartPie size="1.2rem" />
                                     </ThemeIcon>
